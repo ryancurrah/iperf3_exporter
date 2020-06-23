@@ -20,6 +20,7 @@ import (
 	"net/http"
 	"os/exec"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -64,7 +65,7 @@ type iperfResult struct {
 // the prometheus metrics package.
 type Exporter struct {
 	target  string
-        port	int
+	port    int
 	period  time.Duration
 	timeout time.Duration
 	mutex   sync.RWMutex
@@ -80,7 +81,7 @@ type Exporter struct {
 func NewExporter(target string, port int, period time.Duration, timeout time.Duration) *Exporter {
 	return &Exporter{
 		target:          target,
-                port:            port,
+		port:            port,
 		period:          period,
 		timeout:         timeout,
 		success:         prometheus.NewDesc(prometheus.BuildFQName(namespace, "", "success"), "Was the last iperf3 probe successful.", nil, nil),
@@ -114,7 +115,7 @@ func (e *Exporter) Collect(ch chan<- prometheus.Metric) {
 	if err != nil {
 		ch <- prometheus.MustNewConstMetric(e.success, prometheus.GaugeValue, 0)
 		iperfErrors.Inc()
-		log.Errorf("Failed to run iperf3: %s", err)
+		log.Errorf("Failed to run iperf3: %s %s", strings.TrimSpace(string(out)), err)
 		return
 	}
 
@@ -140,22 +141,22 @@ func handler(w http.ResponseWriter, r *http.Request) {
 		iperfErrors.Inc()
 		return
 	}
-        
-        var targetPort int
-        port := r.URL.Query().Get("port")
-        if port != "" {
-                var err error 
-                targetPort, err = strconv.Atoi(port)
-                if err != nil {
-                        http.Error(w, fmt.Sprintf("'port' parameter must be an integer: %s", err), http.StatusBadRequest)
-                        iperfErrors.Inc()
-                        return
-                }
-        } 
-        if targetPort == 0 {
-                targetPort = 5201
-        }
-        
+
+	var targetPort int
+	port := r.URL.Query().Get("port")
+	if port != "" {
+		var err error
+		targetPort, err = strconv.Atoi(port)
+		if err != nil {
+			http.Error(w, fmt.Sprintf("'port' parameter must be an integer: %s", err), http.StatusBadRequest)
+			iperfErrors.Inc()
+			return
+		}
+	}
+	if targetPort == 0 {
+		targetPort = 5201
+	}
+
 	var runPeriod time.Duration
 	period := r.URL.Query().Get("period")
 	if period != "" {
